@@ -1,5 +1,7 @@
 package com.dvo.order_service.service.impl;
 
+import com.dvo.order_service.client.UserClient;
+import com.dvo.order_service.client.dto.UserDto;
 import com.dvo.order_service.entity.Order;
 import com.dvo.order_service.entity.OrderItem;
 import com.dvo.order_service.entity.OrderStatus;
@@ -10,6 +12,7 @@ import com.dvo.order_service.repository.OrderItemRepository;
 import com.dvo.order_service.repository.OrderRepository;
 import com.dvo.order_service.service.OrderService;
 import com.dvo.order_service.web.model.request.UpsertOrderRequest;
+import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,6 +28,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final OrderMapper orderMapper;
+    private final UserClient userClient;
 
     @Override
     public List<Order> findAll() {
@@ -46,6 +50,12 @@ public class OrderServiceImpl implements OrderService {
     public Order create(Order order) {
         log.info("Call create in OrderServiceImpl with order: {}", order);
 
+        try {
+            UserDto userDto = userClient.getUserById(order.getCustomerId());
+        } catch (FeignException.NotFound e) {
+            throw new EntityNotFoundException(MessageFormat.format("User with ID (customerId): {0} not found", order.getCustomerId()));
+        }
+
         return orderRepository.save(order);
     }
 
@@ -56,7 +66,11 @@ public class OrderServiceImpl implements OrderService {
 
         Order existedOrder = orderRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException(MessageFormat.format("Order with ID: {0} not found", id)));
-
+        try {
+            UserDto userDto = userClient.getUserById(request.getCustomerId());
+        } catch (FeignException.NotFound e) {
+            throw new EntityNotFoundException(MessageFormat.format("User with ID (customerId): {0} not found", request.getCustomerId()));
+        }
         orderMapper.updateRequestToOrder(request, existedOrder);
 
         return orderRepository.save(existedOrder);
@@ -94,7 +108,25 @@ public class OrderServiceImpl implements OrderService {
             throw new EntityExistsException(MessageFormat.format("OrderItem with ID: {0} already exists in Order with ID: {1}", orderItemId, id));
         }
 
+        orderItem.setOrder(existedOrder);
         existedOrder.getOrderItems().add(orderItem);
+        orderRepository.save(existedOrder);
         log.info("Order with ID: {} updated with orderItemId: {}", id, orderItemId);
+    }
+
+    @Override
+    public void deleteOrderItemFromOrder(Long id, Long orderItemId) {
+        log.info("Call deleteOrderItemFromOrder in OrderServiceImpl for ID: {}, with orderItemId: {}", id, orderItemId);
+
+        Order existedOrder = orderRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException(MessageFormat.format("Order with ID: {0} not found", id)));
+
+        OrderItem orderItem = orderItemRepository.findById(orderItemId)
+                .orElseThrow(() -> new EntityNotFoundException(MessageFormat.format("OrderItem with ID: {0} not found", orderItemId)));
+
+        orderItem.setOrder(null);
+        existedOrder.getOrderItems().removeIf(item -> item.getId().equals(orderItemId));
+
+        orderRepository.save(existedOrder);
     }
 }

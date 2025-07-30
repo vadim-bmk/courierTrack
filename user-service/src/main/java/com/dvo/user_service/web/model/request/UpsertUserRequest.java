@@ -22,7 +22,7 @@ public class UpsertUserRequest {
 
     private String phone;
 
-    @NotBlank(message = "Role type is required. ADMIN or USER")
+    @NotBlank(message = "Role type is required. ADMIN, COURIER or USER")
     @ValidRoleType
     private String roleType;
 }

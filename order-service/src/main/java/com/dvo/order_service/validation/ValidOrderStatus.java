@@ -7,7 +7,7 @@ import java.lang.annotation.*;
 
 @Documented
 @Constraint(validatedBy = OrderStatusValidator.class)
-@Target(ElementType.FIELD)
+@Target(ElementType.PARAMETER)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ValidOrderStatus {
     String message() default "OrderStatus type must be either NEW, PROCESSING, COMPLETED or CANCELED";

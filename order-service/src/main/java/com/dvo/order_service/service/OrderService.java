@@ -18,4 +18,6 @@ public interface OrderService {
     void setOrderStatus(Long id, OrderStatus status);
 
     void addOrderItem(Long id, Long orderItemId);
+
+    void deleteOrderItemFromOrder(Long id, Long orderItemId);
 }
