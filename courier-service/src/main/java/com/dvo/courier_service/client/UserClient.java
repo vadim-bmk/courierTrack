@@ -1,6 +1,6 @@
-package com.dvo.order_service.client;
+package com.dvo.courier_service.client;
 
-import com.dvo.order_service.client.dto.UserDto;
+import com.dvo.courier_service.client.dto.UserDto;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
