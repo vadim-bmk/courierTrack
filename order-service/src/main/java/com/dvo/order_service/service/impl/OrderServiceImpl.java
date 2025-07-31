@@ -5,6 +5,8 @@ import com.dvo.order_service.client.dto.UserDto;
 import com.dvo.order_service.entity.Order;
 import com.dvo.order_service.entity.OrderItem;
 import com.dvo.order_service.entity.OrderStatus;
+import com.dvo.order_service.event.OrderChangedOrderItem;
+import com.dvo.order_service.event.OrderStatusChangedEvent;
 import com.dvo.order_service.exception.EntityExistsException;
 import com.dvo.order_service.exception.EntityNotFoundException;
 import com.dvo.order_service.mapper.OrderMapper;
@@ -15,6 +17,7 @@ import com.dvo.order_service.web.model.request.UpsertOrderRequest;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +32,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderItemRepository orderItemRepository;
     private final OrderMapper orderMapper;
     private final UserClient userClient;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     @Override
     public List<Order> findAll() {
@@ -56,7 +60,17 @@ public class OrderServiceImpl implements OrderService {
             throw new EntityNotFoundException(MessageFormat.format("User with ID (customerId): {0} not found", order.getCustomerId()));
         }
 
-        return orderRepository.save(order);
+        Order newOrder = orderRepository.save(order);
+
+        OrderStatusChangedEvent event = OrderStatusChangedEvent.builder()
+                .orderId(newOrder.getId())
+                .customerId(newOrder.getCustomerId())
+                .status(newOrder.getStatus().toString())
+                .build();
+
+        kafkaTemplate.send("order-status-topic", event);
+
+        return newOrder;
     }
 
     @Override
@@ -88,6 +102,14 @@ public class OrderServiceImpl implements OrderService {
 
         orderRepository.save(existedOrder);
         log.info("Order with ID: {} updated with status: {}", id, status);
+
+        OrderStatusChangedEvent event = OrderStatusChangedEvent.builder()
+                .orderId(existedOrder.getId())
+                .customerId(existedOrder.getCustomerId())
+                .status(existedOrder.getStatus().toString())
+                .build();
+
+        kafkaTemplate.send("order-status-topic", event);
     }
 
     @Override
@@ -112,6 +134,15 @@ public class OrderServiceImpl implements OrderService {
         existedOrder.getOrderItems().add(orderItem);
         orderRepository.save(existedOrder);
         log.info("Order with ID: {} updated with orderItemId: {}", id, orderItemId);
+
+        OrderChangedOrderItem event = OrderChangedOrderItem.builder()
+                .orderId(existedOrder.getId())
+                .customerId(existedOrder.getCustomerId())
+                .orderItemId(orderItemId)
+                .action("добавлен")
+                .build();
+
+        kafkaTemplate.send("order-changed-order-item-topic", event);
     }
 
     @Override
@@ -128,5 +159,14 @@ public class OrderServiceImpl implements OrderService {
         existedOrder.getOrderItems().removeIf(item -> item.getId().equals(orderItemId));
 
         orderRepository.save(existedOrder);
+
+        OrderChangedOrderItem event = OrderChangedOrderItem.builder()
+                .orderId(existedOrder.getId())
+                .customerId(existedOrder.getCustomerId())
+                .orderItemId(orderItemId)
+                .action("удален")
+                .build();
+
+        kafkaTemplate.send("order-changed-order-item-topic", event);
     }
 }

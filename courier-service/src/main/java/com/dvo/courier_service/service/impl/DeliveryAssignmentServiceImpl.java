@@ -4,6 +4,7 @@ import com.dvo.courier_service.client.OrderClient;
 import com.dvo.courier_service.client.dto.OrderDto;
 import com.dvo.courier_service.entity.Courier;
 import com.dvo.courier_service.entity.DeliveryAssignment;
+import com.dvo.courier_service.event.DeliveryAssignmentsEvent;
 import com.dvo.courier_service.exception.EntityNotFoundException;
 import com.dvo.courier_service.mapper.DeliveryAssignmentMapper;
 import com.dvo.courier_service.repository.CourierRepository;
@@ -13,6 +14,7 @@ import com.dvo.courier_service.web.model.request.UpsertDeliveryAssignmentRequest
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +29,7 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentService 
     private final DeliveryAssignmentMapper deliveryAssignmentMapper;
     private final OrderClient orderClient;
     private final CourierRepository courierRepository;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     @Override
     public List<DeliveryAssignment> findAll() {
@@ -58,6 +61,15 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentService 
                 .orElseThrow(() -> new EntityNotFoundException(MessageFormat.format("Courier with ID: {0} not found", request.getCourierId())));
 
         DeliveryAssignment deliveryAssignment = deliveryAssignmentMapper.requestToDeliveryAssignment(request, courier);
+
+        DeliveryAssignmentsEvent event = DeliveryAssignmentsEvent.builder()
+                .courierId(deliveryAssignment.getCourier().getId())
+                .orderId(deliveryAssignment.getOrderId())
+                .customerId(orderClient.getOrderById(request.getOrderId()).getCustomerId())
+                .assignedAt(deliveryAssignment.getAssignedAt())
+                .build();
+
+        kafkaTemplate.send("delivery-assignment-topic", event);
 
         return deliveryAssignmentRepository.save(deliveryAssignment);
     }
