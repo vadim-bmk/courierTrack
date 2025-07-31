@@ -73,4 +73,15 @@ public class DeliveryAssignmentController {
         deliveryAssignmentService.deleteById(id);
         return ResponseEntity.noContent().build();
     }
+
+    @GetMapping("/order/{orderId}")
+    @ResponseStatus(HttpStatus.OK)
+    @Operation(summary = "Get delivery assignment by order ID")
+    public ResponseEntity<DeliveryAssignmentResponse> findByOrderId(@PathVariable Long orderId){
+        return ResponseEntity.ok(
+                deliveryAssignmentMapper.deliveryAssignmentToResponse(
+                        deliveryAssignmentService.findByOrderId(orderId)
+                )
+        );
+    }
 }

@@ -15,4 +15,6 @@ public interface DeliveryAssignmentService {
     DeliveryAssignment update(UpsertDeliveryAssignmentRequest request, Long id);
 
     void deleteById(Long id);
+
+    DeliveryAssignment findByOrderId(Long orderId);
 }

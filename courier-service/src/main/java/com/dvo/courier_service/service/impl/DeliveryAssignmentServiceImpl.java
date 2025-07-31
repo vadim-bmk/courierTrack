@@ -103,4 +103,12 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentService 
 
         deliveryAssignmentRepository.deleteById(id);
     }
+
+    @Override
+    public DeliveryAssignment findByOrderId(Long orderId) {
+        log.info("Call findByOrderId in DeliveryAssignmentServiceImpl with orderID: {}", orderId);
+
+        return deliveryAssignmentRepository.findByOrderId(orderId)
+                .orElseThrow(() -> new EntityNotFoundException(MessageFormat.format("DeliveryAssignment with order ID: {0} not found", orderId)));
+    }
 }
